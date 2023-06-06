@@ -39,6 +39,7 @@ def build_dataset(dataset_config,
 
     SemKITTI_demo = get_pc_model_class('SemKITTI_demo')
 
+    print("data_dir: {}".format(data_dir))
     demo_pt_dataset = SemKITTI_demo(data_dir, imageset=imageset,
                               return_ref=True, label_mapping=label_mapping, demo_label_path=demo_label_dir)
 
@@ -62,10 +63,11 @@ def main(args):
     pytorch_device = torch.device('cuda:0')
     config_path = args.config_path
     configs = load_config_data(config_path)
+    # raise RuntimeError("config load done")
     dataset_config = configs['dataset_params']
-    data_dir = args.demo_folder
+    data_dir = args.demo_folder    # 每一帧点云文件路径
     demo_label_dir = args.demo_label_folder
-    save_dir = args.save_folder + "/"
+    save_dir = args.save_folder + "/"   # 文件保存路径
 
     demo_batch_size = 1
     model_config = configs['model_params']
@@ -77,23 +79,30 @@ def main(args):
     model_load_path = train_hypers['model_load_path']
 
     SemKITTI_label_name = get_SemKITTI_label_name(dataset_config["label_mapping"])
+    print("SemKITTI_label_name:\n{}".format(SemKITTI_label_name))
+    # raise RuntimeError("label load done")
     unique_label = np.asarray(sorted(list(SemKITTI_label_name.keys())))[1:] - 1
     unique_label_str = [SemKITTI_label_name[x] for x in unique_label + 1]
 
     my_model = model_builder.build(model_config)
+    # raise RuntimeError("model build done")
     if os.path.exists(model_load_path):
         my_model = load_checkpoint(model_load_path, my_model)
+    print("--------------model load done-------------")
+    print("my_model:\n{}".format(my_model))
+    # raise RuntimeError("model load done")
 
     my_model.to(pytorch_device)
     optimizer = optim.Adam(my_model.parameters(), lr=train_hypers["learning_rate"])
 
     loss_func, lovasz_softmax = loss_builder.build(wce=True, lovasz=True,
                                                    num_class=num_class, ignore_label=ignore_label)
-
+    print("loss_func:\n{}".format(loss_func))
     demo_dataset_loader = build_dataset(dataset_config, data_dir, grid_size=grid_size, demo_label_dir=demo_label_dir)
     with open(dataset_config["label_mapping"], 'r') as stream:
         semkittiyaml = yaml.safe_load(stream)
     inv_learning_map = semkittiyaml['learning_map_inv']
+    print("inv_learning_map:\n{}".format(inv_learning_map))
 
     my_model.eval()
     hist_list = []
@@ -106,7 +115,10 @@ def main(args):
             demo_grid_ten = [torch.from_numpy(i).to(pytorch_device) for i in demo_grid]
             demo_label_tensor = demo_vox_label.type(torch.LongTensor).to(pytorch_device)
 
+            print("len(demo_pt_fea_ten): {}\ndemo_pt_fea_ten[0].shape: {}\ntype(demo_pt_fea_ten[0]): {}".format(len(demo_pt_fea_ten), demo_pt_fea_ten[0].shape, type(demo_pt_fea_ten[0])))  # demo_pt_fea_ten[0].shape: torch.Size([124668, 9])
+            print("len(demo_grid_ten): {}\ndemo_grid_ten[0].shape: {}\ntype(demo_grid_ten[0]): {}".format(len(demo_grid_ten), demo_grid_ten[0].shape, type(demo_grid_ten[0])))      # demo_grid_ten[0].shape: torch.Size([124668, 3])
             predict_labels = my_model(demo_pt_fea_ten, demo_grid_ten, demo_batch_size)
+            print(type(predict_labels))
             loss = lovasz_softmax(torch.nn.functional.softmax(predict_labels).detach(), demo_label_tensor,
                                   ignore=0) + loss_func(predict_labels.detach(), demo_label_tensor)
             predict_labels = torch.argmax(predict_labels, dim=1)
@@ -118,7 +130,7 @@ def main(args):
                                                 unique_label))
                 inv_labels = np.vectorize(inv_learning_map.__getitem__)(predict_labels[count, demo_grid[count][:, 0], demo_grid[count][:, 1], demo_grid[count][:, 2]]) 
                 inv_labels = inv_labels.astype('uint32')
-                outputPath = save_dir + str(i_iter_demo).zfill(6) + '.label'
+                outputPath = save_dir + str(i_iter_demo).zfill(6) + '.label'   # 输出路径
                 inv_labels.tofile(outputPath)
                 print("save " + outputPath)
             demo_loss_list.append(loss.detach().cpu().numpy())
@@ -146,6 +158,8 @@ if __name__ == '__main__':
     parser.add_argument('--demo-label-folder', type=str, default='', help='path to the folder containing demo labels')
     args = parser.parse_args()
 
+    print("---------------sys.argv--------------")
     print(' '.join(sys.argv))
     print(args)
+    print("---------------main------------------")
     main(args)

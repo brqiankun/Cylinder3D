@@ -25,6 +25,7 @@ def get_pc_model_class(name):
     assert name in REGISTERED_PC_DATASET_CLASSES, f"available class: {REGISTERED_PC_DATASET_CLASSES}"
     return REGISTERED_PC_DATASET_CLASSES[name]
 
+# 从点云文件中读取数据
 @register_dataset
 class SemKITTI_demo(data.Dataset):
     def __init__(self, data_path, imageset='demo',
@@ -36,7 +37,7 @@ class SemKITTI_demo(data.Dataset):
         self.return_ref = return_ref
 
         self.im_idx = []
-        self.im_idx += absoluteFilePaths(data_path)
+        self.im_idx += absoluteFilePaths(data_path)  # 点云***.bin 绝对路径
         self.label_idx = []
         if self.imageset == 'val':
             print(demo_label_path)
@@ -47,7 +48,9 @@ class SemKITTI_demo(data.Dataset):
         return len(self.im_idx)
 
     def __getitem__(self, index):
+        # print("self.im_idx[index]: {}".format(self.im_idx[index]))
         raw_data = np.fromfile(self.im_idx[index], dtype=np.float32).reshape((-1, 4))
+        print("self.im_idx[index]: {}\nraw_data.shape: {}".format(self.im_idx[index], raw_data.shape))
         if self.imageset == 'demo':
             annotated_data = np.expand_dims(np.zeros_like(raw_data[:, 0], dtype=int), axis=1)
         elif self.imageset == 'val':
@@ -81,6 +84,7 @@ class SemKITTI_sk(data.Dataset):
         self.im_idx = []
         for i_folder in split:
             self.im_idx += absoluteFilePaths('/'.join([data_path, str(i_folder).zfill(2), 'velodyne']))
+        print("self.im_idx[0]:\n{}".format(self.im_idx[0]))
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -96,6 +100,7 @@ class SemKITTI_sk(data.Dataset):
             annotated_data = annotated_data & 0xFFFF  # delete high 16 digits binary
             annotated_data = np.vectorize(self.learning_map.__getitem__)(annotated_data)
 
+        # 取出每个点的前三维
         data_tuple = (raw_data[:, :3], annotated_data.astype(np.uint8))
         if self.return_ref:
             data_tuple += (raw_data[:, 3],)

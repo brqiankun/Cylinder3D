@@ -27,9 +27,13 @@
 - PyTorch >= 1.2 
 - yaml
 - Cython
-- [torch-scatter](https://github.com/rusty1s/pytorch_scatter)
+- [torch-scatter](https://github.com/rusty1s/pytorch_scatter)   done
 - [nuScenes-devkit](https://github.com/nutonomy/nuscenes-devkit) (optional for nuScenes)
-- [spconv](https://github.com/traveller59/spconv) (tested with spconv==1.2.1 and cuda==10.2)
+- [spconv](https://github.com/traveller59/spconv) (tested with spconv==1.2.1 and cuda==10.2)  done
+
+依赖库都存在，可以用于plugin集成
+spconv的C++实现版本
+pytorch_scatter的C++实现
 
 ## Data Preparation
 
@@ -119,3 +123,88 @@ If you find our work useful in your research, please consider citing our [paper]
 
 ## Acknowledgments
 We thanks for the opensource codebases, [PolarSeg](https://github.com/edwardzhou130/PolarSeg) and [spconv](https://github.com/traveller59/spconv)
+
+
+下载seg-kitti数据集，下载cylinder预训练模型
+
+## 激光雷达语义分割:
+### 投影到2D空间
+球面/BEV投影 spherical/BEV projection  2D图像损失3D拓扑和几何关系
+1. 球面投影得到密集2D图像
+2. 鸟瞰图像，压缩高度信息
+3. 体素化， 长方体，圆柱体
+
+### 直接在3D空间处理点云
+1. 3D cylinder partition and a 3D cylinder convolution
+3D圆柱划分和3D圆柱卷积， 3D网络
+- __3维卷积__  提取3D特征 对体素化后的3D网格进行3D卷积
+- __圆柱分区处理__ 平衡驾驶场景点云按远近分布不均的特点
+- 长方体物体使用里非对称残差模块
+
+2. 维度分解的上下文建模，融合多帧信息
+
+### 网络结构
+1. 点云圆柱体分区(3D 表示)
+cylinder_fea: 
+  1. input :pt_fea_ten: [60000, 9], grid_ten: [60000, 3]
+  2. 对grid_ten进行pad  [60000, 9],           [60000, 4]
+
+
+Asymm_3d_spconv:
+
+
+2. 3D U-Net 处理3D表示 输入是[C, H, W, L]
+- 非对称残差模块来适应长方体物体 asymmetry residual block
+- 基于维度分解的上下文建模 Dimension-Decomposition Based Context Modeling
+3. 分割头， segmentation backbone 是 3d卷积层(kernel 3x3x3) 输出是[Class, H, W, L]
+
+主要就是Conv3D 和 DeConv3D
+
+圆柱坐标系代替笛卡尔坐标系
+- 坐标系(x, y, z)转换到柱坐标(p, e, z)，随距离的增加体素增大。送入3D点网络，得到特征图为[C, H, W, L] C为特征维度
+- 基于维度分解的上下文建模(DDCM), 分为长，宽，高共3个维度的, 之后进行融合
+
+主干网络是U-Net， 3D卷积来自spconv
+
+4. loss
+For network optimization, we use __a weighted cross-entropy loss__ and __a lovasz-softmax loss__ to
+maximize the point accuracy and the intersection-over-union score for classes. Two losses share the same weight. Thus, the total loss is: ζ all = ζ iou + ζ acc . For the optimizer, Adam with an initial learning rate of 0.001, is employed.
+
+5. dataset
+SemanticKITTI, 原始数据集共28个类别，最终保留19个类别
+
+
+```
+python demo_folder.py -y ./config/semantickitti.yaml --demo-folder ./work/infer_test/velodyne --save-folder ./work/infer_test/labels/
+```
+1650 显存占用
+3861MiB /  3911MiB
+1650 可以推理，将代码适配spconv1 => spconv2
+
+
+模型训练显存不足  单batch也不行， 导出onnx也会显存不足
+```
+bash train.sh
+```
+
+
+数据读取与预处理
+xxx.bin文件中存储的是点的坐标和强度值
+(498420,)
+(124605, 4)
+```
+self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000000.bin
+raw_data.shape: (124668, 4)
+
+self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000001.bin
+raw_data.shape: (124605, 4)
+
+self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000002.bin
+raw_data.shape: (124478, 4)
+
+self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000003.bin
+raw_data.shape: (124167, 4)
+
+self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000004.bin
+raw_data.shape: (123969, 4)
+```

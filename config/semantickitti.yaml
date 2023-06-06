@@ -41,15 +41,17 @@ dataset_params:
 ###################
 ## Data_loader options
 train_data_loader:
-  data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
+  # data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
+  data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
   imageset: "train"
   return_ref: True
-  batch_size: 2
-  shuffle: True
+  batch_size: 1
+  shuffle: False
   num_workers: 4
 
 val_data_loader:
-  data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
+  # data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
+  data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
   imageset: "val"
   return_ref: True
   batch_size: 1
@@ -60,8 +62,8 @@ val_data_loader:
 ###################
 ## Train params
 train_params:
-  model_load_path: "./model_load_dir/model_load.pt"
-  model_save_path: "./model_save_dir/model_save.pt"
+  model_load_path: "./work/model_load_dir/cylinder3d_pretrained_model.pt"
+  model_save_path: "./work/model_save_dir/model_save.pt"
   checkpoint_every_n_steps: 4599
   max_num_epochs: 40
   eval_every_n_steps: 4599
