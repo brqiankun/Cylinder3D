@@ -208,3 +208,28 @@ raw_data.shape: (124167, 4)
 self.im_idx[index]: /home/br/program/cylinder3d/work/infer_test/velodyne/000004.bin
 raw_data.shape: (123969, 4)
 ```
+
+需要在新电脑安装环境
+1. pytorch支持CUDA11.7 CUDA11.8等
+pytorch2.0/1.13 支持CUDA11.7 因此安装cuda11.7
+```
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia
+```
+2. CUDA11.7支持的Ubuntu版本为
+(https://docs.nvidia.com/cuda/archive/11.7.1/cuda-installation-guide-linux/index.html)
+Distribution              Kernel      DefaultGCC  GLIBC  
+Ubuntu 22.04 	            5.15.0-25 	11.2.0 	    2.35  
+Ubuntu 20.04.z (z <= 4) 	5.13.0-30 	9.3.0 	    2.31  
+Ubuntu 18.04.z (z <= 6) 	5.4.0-89 	  7.5.0 	    2.27  
+0606下载的版本是20.04.6不满足要求, 而且据调查，ubuntu20.04存在新网卡，声卡等硬件兼容问题，需要升级内核版本到(5.14)，而升级后无法和CUDA安装需求对应，因此安装ubuntu22.04
+
+
+WSL2也可以用cuda？
+https://zhuanlan.zhihu.com/p/621142457
+https://learn.microsoft.com/en-us/windows/wsl/install
+https://developer.nvidia.com/cuda/wsl
+https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl
+目前WSL不支持Unified Memory和Pinned system memory, Root user on bare metal (not containers) will not find nvidia-smi at the expected location.等限制
+还是算了，安装ubuntu22.04
+
+
