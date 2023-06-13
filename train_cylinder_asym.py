@@ -56,7 +56,7 @@ def main(args):
     if os.path.exists(model_load_path):
         my_model = load_checkpoint(model_load_path, my_model)
 
-    my_model.to(pytorch_device)
+    my_model.to(pytorch_device).half()  # float model to half
     optimizer = optim.Adam(my_model.parameters(), lr=train_hypers["learning_rate"])
 
     loss_func, lovasz_softmax = loss_builder.build(wce=True, lovasz=True,

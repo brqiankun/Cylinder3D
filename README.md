@@ -29,7 +29,13 @@
 - Cython
 - [torch-scatter](https://github.com/rusty1s/pytorch_scatter)   done
 - [nuScenes-devkit](https://github.com/nutonomy/nuscenes-devkit) (optional for nuScenes)
-- [spconv](https://github.com/traveller59/spconv) (tested with spconv==1.2.1 and cuda==10.2)  done
+- [spconv](https://github.com/traveller59/spconv) (tested with spconv==1.2.1 and cuda==10.2)  done  
+
+```
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple strictyaml
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple spconv-cu117
+conda install pytorch-scatter -c pyg
+```
 
 依赖库都存在，可以用于plugin集成
 spconv的C++实现版本
@@ -173,7 +179,7 @@ maximize the point accuracy and the intersection-over-union score for classes. T
 5. dataset
 SemanticKITTI, 原始数据集共28个类别，最终保留19个类别
 
-
+### infer_test
 ```
 python demo_folder.py -y ./config/semantickitti.yaml --demo-folder ./work/infer_test/velodyne --save-folder ./work/infer_test/labels/
 ```
@@ -182,10 +188,13 @@ python demo_folder.py -y ./config/semantickitti.yaml --demo-folder ./work/infer_
 1650 可以推理，将代码适配spconv1 => spconv2
 
 
-模型训练显存不足  单batch也不行， 导出onnx也会显存不足
+### train
 ```
 bash train.sh
 ```
+- 1650模型训练显存不足  单batch也不行， 导出onnx也会显存不足
+- 4060可以训练，   7616MiB /  8188MiB
+
 
 
 数据读取与预处理
@@ -228,8 +237,18 @@ WSL2也可以用cuda？
 https://zhuanlan.zhihu.com/p/621142457
 https://learn.microsoft.com/en-us/windows/wsl/install
 https://developer.nvidia.com/cuda/wsl
-https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl
+https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl 
 目前WSL不支持Unified Memory和Pinned system memory, Root user on bare metal (not containers) will not find nvidia-smi at the expected location.等限制
 还是算了，安装ubuntu22.04
+
+### 导出onnx
+导出pretrained model为onnx
+cylinder3d_pretrained_model.pt(214M)  ==>  cylinder3d_pretrained.onnx(5.1M)
+
+onnx spconv的算子导出 **TODO**
+https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/issues/40
+#### spconv
+(spconv)[https://zhuanlan.zhihu.com/p/467167809]
+
 
 

@@ -42,7 +42,8 @@ dataset_params:
 ## Data_loader options
 train_data_loader:
   # data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
-  data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
+  # data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
+  data_path: "/home/bairui/program/cylinder3d/kitti_odometry_data/dataset/sequences"
   imageset: "train"
   return_ref: True
   batch_size: 1
@@ -51,7 +52,8 @@ train_data_loader:
 
 val_data_loader:
   # data_path: "/data/dataset/semantic_kitti/data_semkitti/dataset/sequences/"
-  data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
+  # data_path: "/home/br/program/cylinder3d/kitti_dataset/sequences"
+  data_path: "/home/bairui/program/cylinder3d/kitti_odometry_data/dataset/sequences"
   imageset: "val"
   return_ref: True
   batch_size: 1

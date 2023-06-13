@@ -9,6 +9,10 @@ import numba as nb
 import multiprocessing
 import torch_scatter
 
+import random
+import logging
+logging.basicConfig(format='%(pathname)s->%(lineno)d: %(message)s', level=logging.INFO)
+
 
 class cylinder_fea(nn.Module):
 
@@ -55,32 +59,34 @@ class cylinder_fea(nn.Module):
     #pt_fea: train_pt_fea_ten, xy_ind: train_vox_ten
     def forward(self, pt_fea, xy_ind):
         cur_dev = pt_fea[0].get_device()
-        print("cur_dev: {}".format(cur_dev))
-        print("pt_fea[0].shape: {}\nxy_ind[0].shape: {}".format(pt_fea[0].shape, xy_ind[0].shape))
+        logging.info("cur_dev: {}".format(cur_dev))
+        logging.info("pt_fea[0].shape: {}; xy_ind[0].shape: {}".format(pt_fea[0].shape, xy_ind[0].shape))
 
         # concate everything
         cat_pt_ind = []
         for i_batch in range(len(xy_ind)):
             cat_pt_ind.append(F.pad(xy_ind[i_batch], (1, 0), 'constant', value=i_batch))
-        print("cat_pt_ind[0].shape: {}".format(cat_pt_ind[0].shape))
+        logging.info("cat_pt_ind[0].shape: {}".format(cat_pt_ind[0].shape))
 
         cat_pt_fea = torch.cat(pt_fea, dim=0)
-        print("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))
+        logging.info("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))
         cat_pt_ind = torch.cat(cat_pt_ind, dim=0)
-        print("cat_pt_ind.shape: {}".format(cat_pt_ind.shape))
+        logging.info("cat_pt_ind.shape: {}".format(cat_pt_ind.shape))
         pt_num = cat_pt_ind.shape[0]
 
         # shuffle the data
-        shuffled_ind = torch.randperm(pt_num, device=cur_dev)
+        # shuffled_ind = torch.randperm(pt_num, device=cur_dev)    # 这一步onnx不支持
+        shuffled_ind = list(range(pt_num))
+        random.shuffle(shuffled_ind)
         cat_pt_fea = cat_pt_fea[shuffled_ind, :]
-        print("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))
+        logging.info("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))
         cat_pt_ind = cat_pt_ind[shuffled_ind, :]   # 点云数据顺序改变
-        print("cat_pt_ind.shape: {}".format(cat_pt_ind.shape))
+        logging.info("cat_pt_ind.shape: {}".format(cat_pt_ind.shape))
 
         # unique xy grid index
         unq, unq_inv, unq_cnt = torch.unique(cat_pt_ind, return_inverse=True, return_counts=True, dim=0)
         unq = unq.type(torch.int64)
-        print("unq.shape: {}".format(unq.shape))
+        logging.info("unq.shape: {}".format(unq.shape))
 
         # process feature
         processed_cat_pt_fea = self.PPmodel(cat_pt_fea)

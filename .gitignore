@@ -4,3 +4,5 @@
 __pycache__
 work/
 kitti_dataset/
+*.onnx
+kitti_odometry_data
