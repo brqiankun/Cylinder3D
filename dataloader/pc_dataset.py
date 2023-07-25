@@ -8,6 +8,11 @@ from torch.utils import data
 import yaml
 import pickle
 
+import logging
+logging.basicConfig(format='%(pathname)s->%(lineno)d: %(message)s', level=logging.INFO)
+def stop_here():
+    raise RuntimeError("🚀" * 5 + "-stop-" + "🚀" * 5)
+
 REGISTERED_PC_DATASET_CLASSES = {}
 
 
@@ -50,17 +55,19 @@ class SemKITTI_demo(data.Dataset):
     def __getitem__(self, index):
         # print("self.im_idx[index]: {}".format(self.im_idx[index]))
         raw_data = np.fromfile(self.im_idx[index], dtype=np.float32).reshape((-1, 4))
-        print("self.im_idx[index]: {}\nraw_data.shape: {}".format(self.im_idx[index], raw_data.shape))
+        logging.info("self.im_idx[index]: {}\nraw_data.shape: {}".format(self.im_idx[index], raw_data.shape))
         if self.imageset == 'demo':
             annotated_data = np.expand_dims(np.zeros_like(raw_data[:, 0], dtype=int), axis=1)
         elif self.imageset == 'val':
             annotated_data = np.fromfile(self.label_idx[index], dtype=np.uint32).reshape((-1, 1))
             annotated_data = annotated_data & 0xFFFF  # delete high 16 digits binary
-            annotated_data = np.vectorize(self.learning_map.__getitem__)(annotated_data)
+            annotated_data = np.vectorize(self.learning_map.__getitem__)(annotated_data)  # 按照learning_map 映射到学习类别
 
         data_tuple = (raw_data[:, :3], annotated_data.astype(np.uint8))
+        # logging.info(data_tuple[0].shape)
+        # logging.info(data_tuple[1].shape)
         if self.return_ref:
-            data_tuple += (raw_data[:, 3],)
+            data_tuple += (raw_data[:, 3],)  # xyz坐标，标签，反射率
         return data_tuple
 
 @register_dataset

@@ -26,6 +26,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
+import logging
+logging.basicConfig(format='%(pathname)s->%(lineno)d: %(message)s', level=logging.INFO)
+def stop_here():
+    raise RuntimeError("🚀" * 5 + "-stop-" + "🚀" * 5)
+
+
 def build_dataset(dataset_config,
                   data_dir,
                   grid_size=[480, 360, 32],
@@ -88,7 +94,8 @@ def main(args):
     # raise RuntimeError("model build done")
     if os.path.exists(model_load_path):
         my_model = load_checkpoint(model_load_path, my_model)
-    print("--------------model load done-------------")
+        print("----------------load checkpoint done-------------------\n\n")
+    print("--------------model load done-------------\n\n")
     print("my_model:\n{}".format(my_model))
     # raise RuntimeError("model load done")
 
@@ -113,16 +120,19 @@ def main(args):
             demo_pt_fea_ten = [torch.from_numpy(i).type(torch.FloatTensor).to(pytorch_device) for i in
                               demo_pt_fea]
             demo_grid_ten = [torch.from_numpy(i).to(pytorch_device) for i in demo_grid]
-            demo_label_tensor = demo_vox_label.type(torch.LongTensor).to(pytorch_device)
+            demo_label_tensor = demo_vox_label.type(torch.LongTensor).to(pytorch_device)  # 每个体素的标签
+            logging.info("demo_label_tensor[0]: {}".format(demo_label_tensor[0].shape))
 
-            print("len(demo_pt_fea_ten): {}\ndemo_pt_fea_ten[0].shape: {}\ntype(demo_pt_fea_ten[0]): {}".format(len(demo_pt_fea_ten), demo_pt_fea_ten[0].shape, type(demo_pt_fea_ten[0])))  # demo_pt_fea_ten[0].shape: torch.Size([124668, 9])
-            print("len(demo_grid_ten): {}\ndemo_grid_ten[0].shape: {}\ntype(demo_grid_ten[0]): {}".format(len(demo_grid_ten), demo_grid_ten[0].shape, type(demo_grid_ten[0])))      # demo_grid_ten[0].shape: torch.Size([124668, 3])
+            logging.info("len(demo_pt_fea_ten): {}   demo_pt_fea_ten[0].shape: {}  type(demo_pt_fea_ten[0]): {}".format(len(demo_pt_fea_ten), demo_pt_fea_ten[0].shape, type(demo_pt_fea_ten[0])))  # demo_pt_fea_ten[0].shape: torch.Size([124668, 9])
+            logging.info("len(demo_grid_ten): {}  demo_grid_ten[0].shape: {}   type(demo_grid_ten[0]): {}".format(len(demo_grid_ten), demo_grid_ten[0].shape, type(demo_grid_ten[0])))      # demo_grid_ten[0].shape: torch.Size([124668, 3])  得到极坐标坐标系下每个点所属的体素坐标(int, 索引)
             predict_labels = my_model(demo_pt_fea_ten, demo_grid_ten, demo_batch_size)
             print(type(predict_labels))
             loss = lovasz_softmax(torch.nn.functional.softmax(predict_labels).detach(), demo_label_tensor,
                                   ignore=0) + loss_func(predict_labels.detach(), demo_label_tensor)
             predict_labels = torch.argmax(predict_labels, dim=1)
             predict_labels = predict_labels.cpu().detach().numpy()
+            logging.info("predict_labels.shape: {}".format(predict_labels.shape))
+            stop_here()
             for count, i_demo_grid in enumerate(demo_grid):
                 hist_list.append(fast_hist_crop(predict_labels[
                                                     count, demo_grid[count][:, 0], demo_grid[count][:, 1],

@@ -252,3 +252,5 @@ https://github.com/NVIDIA-AI-IOT/Lidar_AI_Solution/issues/40
 
 
 
+回去重新在kitti数据集下预训练模型上fine tune
+为何预训练模型的输出类别都是70？？

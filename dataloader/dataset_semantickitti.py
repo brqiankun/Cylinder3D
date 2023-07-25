@@ -14,6 +14,12 @@ import yaml
 from torch.utils import data
 import pickle
 
+
+import logging
+logging.basicConfig(format='%(pathname)s->%(lineno)d: %(message)s', level=logging.INFO)
+def stop_here():
+    raise RuntimeError("🚀" * 5 + "-stop-" + "🚀" * 5)
+
 REGISTERED_DATASET_CLASSES = {}
 
 
@@ -200,10 +206,10 @@ class cylinder_dataset(data.Dataset):
 
         # random data augmentation by rotation
         if self.rotate_aug:
-            rotate_rad = np.deg2rad(np.random.random() * 90) - np.pi / 4
+            rotate_rad = np.deg2rad(np.random.random() * 90) - np.pi / 4  # 随机旋转的弧度
             c, s = np.cos(rotate_rad), np.sin(rotate_rad)
             j = np.matrix([[c, s], [-s, c]])
-            xyz[:, :2] = np.dot(xyz[:, :2], j)
+            xyz[:, :2] = np.dot(xyz[:, :2], j)    # 增加鲁棒性？为何要将点云x, y坐标进行旋转
 
         # random data augmentation by flip x , y or x+y
         if self.flip_aug:
@@ -227,51 +233,77 @@ class cylinder_dataset(data.Dataset):
 
             xyz[:, 0:3] += noise_translate
 
-        xyz_pol = cart2polar(xyz)
+        xyz_pol = cart2polar(xyz)   # 笛卡尔坐标系到极坐标系，x，y转换为极坐标(rho, phi)
 
-        max_bound_r = np.percentile(xyz_pol[:, 0], 100, axis=0)
-        min_bound_r = np.percentile(xyz_pol[:, 0], 0, axis=0)
+        max_bound_r = np.percentile(xyz_pol[:, 0], 100, axis=0) # 最大rho
+        min_bound_r = np.percentile(xyz_pol[:, 0], 0, axis=0)   # 最小rho
         max_bound = np.max(xyz_pol[:, 1:], axis=0)
         min_bound = np.min(xyz_pol[:, 1:], axis=0)
+        # logging.info(max_bound)
+        # logging.info(min_bound)
+        # stop_here()
         max_bound = np.concatenate(([max_bound_r], max_bound))
         min_bound = np.concatenate(([min_bound_r], min_bound))
         if self.fixed_volume_space:
             max_bound = np.asarray(self.max_volume_space)
             min_bound = np.asarray(self.min_volume_space)
+        # 得到极坐标系下点云坐标边界， max_volume_space, min_volume_space
+        logging.info(max_bound)
+        logging.info(min_bound)
         # get grid index
         crop_range = max_bound - min_bound
-        cur_grid_size = self.grid_size
-        intervals = crop_range / (cur_grid_size - 1)
+        logging.info(crop_range)
+        cur_grid_size = self.grid_size  # [480, 360, 32]
+        intervals = crop_range / (cur_grid_size - 1)  # 间隔
+        logging.info(intervals)  # [0.10438413 0.01750191 0.19354839]
 
         if (intervals == 0).any(): print("Zero interval!")
+        # 得到极坐标坐标系下每个点所属的体素坐标(int, 索引)
         grid_ind = (np.floor((np.clip(xyz_pol, min_bound, max_bound) - min_bound) / intervals)).astype(int)
 
         voxel_position = np.zeros(self.grid_size, dtype=np.float32)
         dim_array = np.ones(len(self.grid_size) + 1, int)
         dim_array[0] = -1
+        logging.info(dim_array) # [-1  1  1  1]
+        logging.info(np.indices(self.grid_size).shape)   # (3, 480, 360, 32)
+        logging.info(intervals.reshape(dim_array).shape)
+        # 体素坐标由索引转换为极坐标(即每个体素对应的极坐标(不管其中是否有点)) 
         voxel_position = np.indices(self.grid_size) * intervals.reshape(dim_array) + min_bound.reshape(dim_array)
-        voxel_position = polar2cat(voxel_position)
+        logging.info(voxel_position.shape)  # (3, 480, 360, 32) 每个体素在极坐标系中的坐标，
+        voxel_position = polar2cat(voxel_position)  # 将体素坐标从极坐标转换为笛卡尔坐标
 
         processed_label = np.ones(self.grid_size, dtype=np.uint8) * self.ignore_label
-        label_voxel_pair = np.concatenate([grid_ind, labels], axis=1)
+        label_voxel_pair = np.concatenate([grid_ind, labels], axis=1)  # 点云在极坐标系下所属的体素坐标和标签pair
+        logging.info(label_voxel_pair.shape)
+        # lexsort先按z高度排序，之后按角度排序，之后按r排序，使坐标相近的点云紧邻
         label_voxel_pair = label_voxel_pair[np.lexsort((grid_ind[:, 0], grid_ind[:, 1], grid_ind[:, 2])), :]
+        logging.info(label_voxel_pair.shape)
         processed_label = nb_process_label(np.copy(processed_label), label_voxel_pair)
-        data_tuple = (voxel_position, processed_label)
+        logging.info(processed_label.shape)  #(480, 360, 32)
+        data_tuple = (voxel_position, processed_label)  # 每个体素在极坐标系中的坐标， 每个体素的标签
 
         # center data on each voxel for PTnet
         voxel_centers = (grid_ind.astype(np.float32) + 0.5) * intervals + min_bound
         return_xyz = xyz_pol - voxel_centers
+        # 输入特征包括每个点极坐标与体素中心的偏差(3)，每个点的极坐标(3)，每个点的xy坐标(2)
+        logging.info(return_xyz.shape)
+        logging.info(xyz_pol.shape)
+        logging.info(xyz[:, :2].shape)
         return_xyz = np.concatenate((return_xyz, xyz_pol, xyz[:, :2]), axis=1)
+        logging.info(return_xyz.shape)
 
         if len(data) == 2:
             return_fea = return_xyz
         elif len(data) == 3:
+            logging.info(sig[..., np.newaxis].shape)  # 每个点的反射强度值(1)
             return_fea = np.concatenate((return_xyz, sig[..., np.newaxis]), axis=1)
 
+        logging.info("return_fea.shape: {}".format(return_fea.shape))
         if self.return_test:
             data_tuple += (grid_ind, labels, return_fea, index)
         else:
-            data_tuple += (grid_ind, labels, return_fea)
+            data_tuple += (grid_ind, labels, return_fea)  # grid_ind得到每个点所属的极坐标坐标系下的体素坐标
+        # stop_here()
         return data_tuple
 
 
@@ -376,6 +408,7 @@ class polar_dataset(data.Dataset):
         return data_tuple
 
 
+# 当同一个体素中有不同类别的标签时，将最多的标签类别设置为当前体素的类别
 @nb.jit('u1[:,:,:](u1[:,:,:],i8[:,:])', nopython=True, cache=True, parallel=False)
 def nb_process_label(processed_label, sorted_label_voxel_pair):
     label_size = 256

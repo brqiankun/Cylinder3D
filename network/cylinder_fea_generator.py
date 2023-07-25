@@ -12,6 +12,8 @@ import torch_scatter
 import random
 import logging
 logging.basicConfig(format='%(pathname)s->%(lineno)d: %(message)s', level=logging.INFO)
+def stop_here():
+    raise RuntimeError("🚀" * 5 + "-stop-" + "🚀" * 5)
 
 
 class cylinder_fea(nn.Module):
@@ -60,7 +62,7 @@ class cylinder_fea(nn.Module):
     def forward(self, pt_fea, xy_ind):
         cur_dev = pt_fea[0].get_device()
         logging.info("cur_dev: {}".format(cur_dev))
-        logging.info("pt_fea[0].shape: {}; xy_ind[0].shape: {}".format(pt_fea[0].shape, xy_ind[0].shape))
+        logging.info("pt_fea[0].shape: {}\nxy_ind[0].shape: {}".format(pt_fea[0].shape, xy_ind[0].shape))
 
         # concate everything
         cat_pt_ind = []
@@ -68,8 +70,8 @@ class cylinder_fea(nn.Module):
             cat_pt_ind.append(F.pad(xy_ind[i_batch], (1, 0), 'constant', value=i_batch))
         logging.info("cat_pt_ind[0].shape: {}".format(cat_pt_ind[0].shape))
 
-        cat_pt_fea = torch.cat(pt_fea, dim=0)
-        logging.info("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))
+        cat_pt_fea = torch.cat(pt_fea, dim=0)   # 将同一batch的点云特征拼接
+        logging.info("cat_pt_fea.shape: {}".format(cat_pt_fea.shape))  # [124668, 9]
         cat_pt_ind = torch.cat(cat_pt_ind, dim=0)
         logging.info("cat_pt_ind.shape: {}".format(cat_pt_ind.shape))
         pt_num = cat_pt_ind.shape[0]
@@ -86,15 +88,21 @@ class cylinder_fea(nn.Module):
         # unique xy grid index
         unq, unq_inv, unq_cnt = torch.unique(cat_pt_ind, return_inverse=True, return_counts=True, dim=0)
         unq = unq.type(torch.int64)
-        logging.info("unq.shape: {}".format(unq.shape))
+        logging.info("unq.shape: {}".format(unq.shape))  # 位于相同体素的点坐标unique，位于不同体素的索引
 
         # process feature
         processed_cat_pt_fea = self.PPmodel(cat_pt_fea)
+        logging.info(processed_cat_pt_fea.shape)  # [124668, 256]
+        # 属于相同体素的点的特征求max作为当前体素的特征
         pooled_data = torch_scatter.scatter_max(processed_cat_pt_fea, unq_inv, dim=0)[0]
-
+        logging.info(pooled_data.shape)  # torch.Size([38576, 256])
+    
         if self.fea_compre:
-            processed_pooled_data = self.fea_compression(pooled_data)
+            processed_pooled_data = self.fea_compression(pooled_data)  #特征通过线性层变为16
         else:
             processed_pooled_data = pooled_data
+        
+        logging.info(processed_pooled_data.shape)   # torch.Size([38576, 16])
+        stop_here()
 
         return unq, processed_pooled_data
